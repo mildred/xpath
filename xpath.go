@@ -2,6 +2,7 @@ package xpath
 
 import (
 	"errors"
+	"fmt"
 )
 
 // NodeType represents a type of XPath node.
@@ -82,6 +83,7 @@ func (t *NodeIterator) Current() NodeNavigator {
 
 // MoveNext moves Navigator to the next match node.
 func (t *NodeIterator) MoveNext() bool {
+	l.Printf("MoveToNext: %s", t.query)
 	n := t.query.Select(t)
 	if n != nil {
 		if !t.node.MoveTo(n) {
@@ -117,6 +119,7 @@ func (f iteratorFunc) Current() NodeNavigator {
 // Evaluate returns the result of the expression.
 // The result type of the expression is one of the follow: bool,float64,string,NodeIterator).
 func (expr *Expr) Evaluate(root NodeNavigator) interface{} {
+	l.Printf("%#v.Evaluate(%p)", expr.s, root)
 	val := expr.q.Evaluate(iteratorFunc(func() NodeNavigator { return root }))
 	switch val.(type) {
 	case query:
@@ -127,12 +130,17 @@ func (expr *Expr) Evaluate(root NodeNavigator) interface{} {
 
 // Select selects a node set using the specified XPath expression.
 func (expr *Expr) Select(root NodeNavigator) *NodeIterator {
+	l.Printf("%#v.Select(%p)", expr.s, root)
 	return &NodeIterator{query: expr.q.Clone(), node: root}
 }
 
 // String returns XPath expression string.
 func (expr *Expr) String() string {
 	return expr.s
+}
+
+func (expr *Expr) DebugString() string {
+	return fmt.Sprintf("xpath.Expr{%#v, %v}", expr.s, expr.q)
 }
 
 // Compile compiles an XPath expression string.

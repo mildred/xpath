@@ -178,6 +178,7 @@ func (b *builder) processAxisNode(root *axisNode) (query, error) {
 		}
 	}
 
+	l.Printf("ProcessAxisNode %s::%s", root.AxeType, root.Prop)
 	switch root.AxeType {
 	case "ancestor":
 		qyOutput = &ancestorQuery{Input: qyInput, Predicate: predicate}

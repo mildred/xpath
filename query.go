@@ -1,6 +1,7 @@
 package xpath
 
 import (
+	"fmt"
 	"reflect"
 )
 
@@ -25,6 +26,10 @@ type contextQuery struct {
 	Root  bool // Moving to root-level node in the current context iterator.
 }
 
+func (c *contextQuery) String() string {
+	return fmt.Sprintf("contextQuery(count=%v, root=%v)", c.count, c.Root)
+}
+
 func (c *contextQuery) Select(t iterator) (n NodeNavigator) {
 	if c.count == 0 {
 		c.count++
@@ -33,6 +38,7 @@ func (c *contextQuery) Select(t iterator) (n NodeNavigator) {
 			n.MoveToRoot()
 		}
 	}
+	l.Printf("context: select %v", n)
 	return n
 }
 
@@ -54,11 +60,16 @@ type ancestorQuery struct {
 	Predicate Predicate
 }
 
+func (c *ancestorQuery) String() string {
+	return fmt.Sprintf("%v.ancestorQuery(Self=%v, Pred=%v)", c.Input, c.Self, c.Predicate)
+}
+
 func (a *ancestorQuery) Select(t iterator) NodeNavigator {
 	for {
 		if a.iterator == nil {
 			node := a.Input.Select(t)
 			if node == nil {
+				l.Printf("ancestor: select nil")
 				return nil
 			}
 			first := true
@@ -66,6 +77,7 @@ func (a *ancestorQuery) Select(t iterator) NodeNavigator {
 				if first && a.Self {
 					first = false
 					if a.Predicate.Test(node) {
+						l.Printf("ancestor: select %v", node)
 						return node
 					}
 				}
@@ -73,13 +85,16 @@ func (a *ancestorQuery) Select(t iterator) NodeNavigator {
 					if !a.Predicate.Test(node) {
 						break
 					}
+					l.Printf("ancestor: select %v", node)
 					return node
 				}
+				l.Printf("ancestor: select nil")
 				return nil
 			}
 		}
 
 		if node := a.iterator(); node != nil {
+			l.Printf("ancestor: select %v", node)
 			return node
 		}
 		a.iterator = nil
@@ -108,11 +123,16 @@ type attributeQuery struct {
 	Predicate Predicate
 }
 
+func (c *attributeQuery) String() string {
+	return fmt.Sprintf("%v.attributeQuery(Pred=%v)", c.Input, c.Predicate)
+}
+
 func (a *attributeQuery) Select(t iterator) NodeNavigator {
 	for {
 		if a.iterator == nil {
 			node := a.Input.Select(t)
 			if node == nil {
+				l.Printf("attribute: select nil")
 				return nil
 			}
 			node = node.Copy()
@@ -120,9 +140,11 @@ func (a *attributeQuery) Select(t iterator) NodeNavigator {
 				for {
 					onAttr := node.MoveToNextAttribute()
 					if !onAttr {
+						l.Printf("attribute: select nil")
 						return nil
 					}
 					if a.Predicate.Test(node) {
+						l.Printf("attribute: select %v", node)
 						return node
 					}
 				}
@@ -130,6 +152,7 @@ func (a *attributeQuery) Select(t iterator) NodeNavigator {
 		}
 
 		if node := a.iterator(); node != nil {
+			l.Printf("attribute: select %v", node)
 			return node
 		}
 		a.iterator = nil
@@ -159,6 +182,10 @@ type childQuery struct {
 	Predicate Predicate
 }
 
+func (c *childQuery) String() string {
+	return fmt.Sprintf("%v.childQuery(posit=%d, Pred=%v)", c.Input, c.posit, c.Predicate)
+}
+
 func (c *childQuery) Select(t iterator) NodeNavigator {
 	for {
 		if c.iterator == nil {
@@ -166,16 +193,29 @@ func (c *childQuery) Select(t iterator) NodeNavigator {
 			node := c.Input.Select(t)
 			if node == nil {
 				return nil
+				l.Printf("child: select nil (input is nil)")
 			}
 			node = node.Copy()
 			first := true
 			c.iterator = func() NodeNavigator {
 				for {
-					if (first && !node.MoveToChild()) || (!first && !node.MoveToNext()) {
-						return nil
+					l.Printf("child: select at %s", node)
+					if first {
+						if !node.MoveToChild() {
+							l.Printf("child: select nil (cannot move to child)")
+							return nil
+						}
+						l.Printf("child: select move to child %s", node)
+					} else {
+						if !node.MoveToNext() {
+							l.Printf("child: select nil (cannot move to next)")
+							return nil
+						}
+						l.Printf("child: select move to next %s", node)
 					}
 					first = false
 					if c.Predicate.Test(node) {
+						l.Printf("child: select %v", node)
 						return node
 					}
 				}
@@ -184,6 +224,7 @@ func (c *childQuery) Select(t iterator) NodeNavigator {
 
 		if node := c.iterator(); node != nil {
 			c.posit++
+			l.Printf("child: select %v", node)
 			return node
 		}
 		c.iterator = nil
@@ -219,12 +260,17 @@ type descendantQuery struct {
 	Predicate Predicate
 }
 
+func (c *descendantQuery) String() string {
+	return fmt.Sprintf("%v.descendantQuery(posit=%d, Self=%v, Pred=%v)", c.Input, c.posit, c.Self, c.Predicate)
+}
+
 func (d *descendantQuery) Select(t iterator) NodeNavigator {
 	for {
 		if d.iterator == nil {
 			d.posit = 0
 			node := d.Input.Select(t)
 			if node == nil {
+				l.Printf("descendant: select nil")
 				return nil
 			}
 			node = node.Copy()
@@ -234,6 +280,7 @@ func (d *descendantQuery) Select(t iterator) NodeNavigator {
 				if first && d.Self {
 					first = false
 					if d.Predicate.Test(node) {
+						l.Printf("descendant: select %v", node)
 						return node
 					}
 				}
@@ -244,6 +291,7 @@ func (d *descendantQuery) Select(t iterator) NodeNavigator {
 					} else {
 						for {
 							if level == 0 {
+								l.Printf("descendant: select nil")
 								return nil
 							}
 							if node.MoveToNext() {
@@ -254,6 +302,7 @@ func (d *descendantQuery) Select(t iterator) NodeNavigator {
 						}
 					}
 					if d.Predicate.Test(node) {
+						l.Printf("descendant: select %v", node)
 						return node
 					}
 				}
@@ -262,6 +311,7 @@ func (d *descendantQuery) Select(t iterator) NodeNavigator {
 
 		if node := d.iterator(); node != nil {
 			d.posit++
+			l.Printf("descendant: select %v", node)
 			return node
 		}
 		d.iterator = nil
@@ -296,11 +346,16 @@ type followingQuery struct {
 	Predicate Predicate
 }
 
+func (c *followingQuery) String() string {
+	return fmt.Sprintf("%v.followingQuery(Sibling=%v, Pred=%v)", c.Input, c.Sibling, c.Predicate)
+}
+
 func (f *followingQuery) Select(t iterator) NodeNavigator {
 	for {
 		if f.iterator == nil {
 			node := f.Input.Select(t)
 			if node == nil {
+				l.Printf("following: select nil")
 				return nil
 			}
 			node = node.Copy()
@@ -308,9 +363,11 @@ func (f *followingQuery) Select(t iterator) NodeNavigator {
 				f.iterator = func() NodeNavigator {
 					for {
 						if !node.MoveToNext() {
+							l.Printf("following: select nil")
 							return nil
 						}
 						if f.Predicate.Test(node) {
+							l.Printf("following: select %v", node)
 							return node
 						}
 					}
@@ -322,6 +379,7 @@ func (f *followingQuery) Select(t iterator) NodeNavigator {
 						if q == nil {
 							for !node.MoveToNext() {
 								if !node.MoveToParent() {
+									l.Printf("following: select nil")
 									return nil
 								}
 							}
@@ -333,6 +391,7 @@ func (f *followingQuery) Select(t iterator) NodeNavigator {
 							t.Current().MoveTo(node)
 						}
 						if node := q.Select(t); node != nil {
+							l.Printf("following: select %v", node)
 							return node
 						}
 						q = nil
@@ -342,6 +401,7 @@ func (f *followingQuery) Select(t iterator) NodeNavigator {
 		}
 
 		if node := f.iterator(); node != nil {
+			l.Printf("following: select %v", node)
 			return node
 		}
 		f.iterator = nil
@@ -369,11 +429,16 @@ type precedingQuery struct {
 	Predicate Predicate
 }
 
+func (c *precedingQuery) String() string {
+	return fmt.Sprintf("%v.precedingQuery(Sibling=%v, Pred=%v)", c.Input, c.Sibling, c.Predicate)
+}
+
 func (p *precedingQuery) Select(t iterator) NodeNavigator {
 	for {
 		if p.iterator == nil {
 			node := p.Input.Select(t)
 			if node == nil {
+				l.Printf("preceding: select nil")
 				return nil
 			}
 			node = node.Copy()
@@ -381,9 +446,11 @@ func (p *precedingQuery) Select(t iterator) NodeNavigator {
 				p.iterator = func() NodeNavigator {
 					for {
 						for !node.MoveToPrevious() {
+							l.Printf("preceding: select nil")
 							return nil
 						}
 						if p.Predicate.Test(node) {
+							l.Printf("preceding: select %v", node)
 							return node
 						}
 					}
@@ -395,6 +462,7 @@ func (p *precedingQuery) Select(t iterator) NodeNavigator {
 						if q == nil {
 							for !node.MoveToPrevious() {
 								if !node.MoveToParent() {
+									l.Printf("preceding: select nil")
 									return nil
 								}
 							}
@@ -406,6 +474,7 @@ func (p *precedingQuery) Select(t iterator) NodeNavigator {
 							t.Current().MoveTo(node)
 						}
 						if node := q.Select(t); node != nil {
+							l.Printf("preceding: select %v", node)
 							return node
 						}
 						q = nil
@@ -414,6 +483,7 @@ func (p *precedingQuery) Select(t iterator) NodeNavigator {
 			}
 		}
 		if node := p.iterator(); node != nil {
+			l.Printf("preceding: select %v", node)
 			return node
 		}
 		p.iterator = nil
@@ -439,14 +509,20 @@ type parentQuery struct {
 	Predicate Predicate
 }
 
+func (c *parentQuery) String() string {
+	return fmt.Sprintf("%v.parentQuery(Pred=%v)", c.Input, c.Predicate)
+}
+
 func (p *parentQuery) Select(t iterator) NodeNavigator {
 	for {
 		node := p.Input.Select(t)
 		if node == nil {
+			l.Printf("parent: select nil")
 			return nil
 		}
 		node = node.Copy()
 		if node.MoveToParent() && p.Predicate.Test(node) {
+			l.Printf("parent: select %v", node)
 			return node
 		}
 	}
@@ -471,14 +547,21 @@ type selfQuery struct {
 	Predicate Predicate
 }
 
+func (c *selfQuery) String() string {
+	return fmt.Sprintf("%v.selfQuery(Pred=%v)", c.Input, c.Predicate)
+}
+
 func (s *selfQuery) Select(t iterator) NodeNavigator {
 	for {
+		l.Printf("self: select input...")
 		node := s.Input.Select(t)
 		if node == nil {
+			l.Printf("self: select nil")
 			return nil
 		}
 
 		if s.Predicate.Test(node) {
+			l.Printf("self: select %v", node)
 			return node
 		}
 	}
@@ -503,6 +586,10 @@ type filterQuery struct {
 	Predicate query
 }
 
+func (c *filterQuery) String() string {
+	return fmt.Sprintf("%v.filterQuery(Pred=%v)", c.Input, c.Predicate)
+}
+
 func (f *filterQuery) do(t iterator) bool {
 	val := reflect.ValueOf(f.Predicate.Evaluate(t))
 	switch val.Kind() {
@@ -525,6 +612,7 @@ func (f *filterQuery) Select(t iterator) NodeNavigator {
 	for {
 		node := f.Input.Select(t)
 		if node == nil {
+			l.Printf("filter: select %v", node)
 			return node
 		}
 		node = node.Copy()
@@ -532,6 +620,7 @@ func (f *filterQuery) Select(t iterator) NodeNavigator {
 
 		t.Current().MoveTo(node)
 		if f.do(t) {
+			l.Printf("filter: select %v", node)
 			return node
 		}
 	}
@@ -553,7 +642,12 @@ type functionQuery struct {
 	Func  func(query, iterator) interface{} // The xpath function.
 }
 
+func (c *functionQuery) String() string {
+	return fmt.Sprintf("%v.functionQuery(Func=%v)", c.Input, c.Func)
+}
+
 func (f *functionQuery) Select(t iterator) NodeNavigator {
+	l.Printf("function: select nil")
 	return nil
 }
 
@@ -572,7 +666,12 @@ type constantQuery struct {
 	Val interface{}
 }
 
+func (c *constantQuery) String() string {
+	return fmt.Sprintf("constantQuery(%#v)", c.Val)
+}
+
 func (c *constantQuery) Select(t iterator) NodeNavigator {
+	l.Printf("constant: select nil")
 	return nil
 }
 
@@ -591,16 +690,22 @@ type logicalQuery struct {
 	Do func(iterator, interface{}, interface{}) interface{}
 }
 
-func (l *logicalQuery) Select(t iterator) NodeNavigator {
+func (c *logicalQuery) String() string {
+	return fmt.Sprintf("logicalQuery{%v, %v}", c.Left, c.Right)
+}
+
+func (lq *logicalQuery) Select(t iterator) NodeNavigator {
 	// When a XPath expr is logical expression.
 	node := t.Current().Copy()
-	val := l.Evaluate(t)
+	val := lq.Evaluate(t)
 	switch val.(type) {
 	case bool:
 		if val.(bool) == true {
+			l.Printf("logical: select %v", node)
 			return node
 		}
 	}
+	l.Printf("logical: select nil")
 	return nil
 }
 
@@ -621,7 +726,12 @@ type numericQuery struct {
 	Do func(interface{}, interface{}) interface{}
 }
 
+func (c *numericQuery) String() string {
+	return fmt.Sprintf("numericQuery{%v, %v}", c.Left, c.Right)
+}
+
 func (n *numericQuery) Select(t iterator) NodeNavigator {
+	l.Printf("numeric: select nil")
 	return nil
 }
 
@@ -639,6 +749,14 @@ type booleanQuery struct {
 	IsOr        bool
 	Left, Right query
 	iterator    func() NodeNavigator
+}
+
+func (c *booleanQuery) String() string {
+	if c.IsOr {
+		return fmt.Sprintf("orQuery(%v || %v)", c.IsOr, c.Left, c.Right)
+	} else {
+		return fmt.Sprintf("andQuery(%v && %v)", c.IsOr, c.Left, c.Right)
+	}
 }
 
 func (b *booleanQuery) Select(t iterator) NodeNavigator {
@@ -695,14 +813,18 @@ func (b *booleanQuery) Select(t iterator) NodeNavigator {
 
 		b.iterator = func() NodeNavigator {
 			if i >= len(list) {
+				l.Printf("boolean: select nil")
 				return nil
 			}
 			node := list[i]
 			i++
+			l.Printf("boolean: select %v", node)
 			return node
 		}
 	}
-	return b.iterator()
+	res := b.iterator()
+	l.Printf("boolean: select %v", res)
+	return res
 }
 
 func (b *booleanQuery) Evaluate(t iterator) interface{} {
